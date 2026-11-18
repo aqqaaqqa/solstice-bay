@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Solstice Bay — an open-world crime game</title>
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #1b1f2a;
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif; color: #f2ede2; }
+  #game { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+  .hidden { display: none !important; }
+  #hud { position: fixed; inset: 0; pointer-events: none; z-index: 5; }
+  .panel { background: rgba(16, 20, 30, 0.72); border: 1px solid rgba(242, 194, 48, 0.35);
+    border-radius: 8px; padding: 8px 12px; }
+  #hud-mission { position: absolute; top: 14px; left: 14px; width: 300px; }
+  #hud-mission-title { font-size: 17px; font-weight: 800; letter-spacing: 0.5px; color: #f2c230; }
+  #hud-mission-text { font-size: 14px; margin-top: 2px; }
+  #hud-mission-bar-wrap { height: 6px; background: rgba(255,255,255,0.18); border-radius: 3px; margin-top: 6px; }
+  #hud-mission-bar { height: 6px; background: #f2c230; border-radius: 3px; width: 0; }
+  #hud-mission-timer { font-size: 13px; color: #ffd98a; margin-top: 3px; }
+  #hud-top-center { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); text-align: center; }
+  #hud-stars { font-size: 26px; letter-spacing: 4px; color: #f2c230; text-shadow: 0 0 8px rgba(0,0,0,0.8); }
+  #hud-police { font-size: 11px; color: #ffb0a0; margin-top: 2px; text-shadow: 0 0 6px rgba(0,0,0,0.9); white-space: nowrap; }
+  #hud-top-right { position: absolute; top: 14px; right: 14px; text-align: right; }
+  #hud-money { font-size: 24px; font-weight: 800; color: #7ddb8a; text-shadow: 0 0 8px rgba(0,0,0,0.8); }
+  #hud-rep, #hud-day { font-size: 13px; color: #e8e2d0; }
+  #hud-bottom-left { position: absolute; left: 14px; bottom: 14px; }
+  #hud-minimap { width: 190px; height: 190px; border-radius: 50%; border: 3px solid rgba(242,194,48,0.7);
+    background: rgba(20,28,40,0.88); }
+  #hud-district { font-size: 14px; font-weight: 700; margin-top: 6px; text-shadow: 0 0 6px rgba(0,0,0,0.9); }
+  .bar-wrap { height: 8px; background: rgba(255,255,255,0.18); border-radius: 4px; margin-top: 4px; width: 190px; }
+  #hud-health { height: 8px; background: #5fd06a; border-radius: 4px; width: 100%; }
+  #hud-armour { height: 8px; background: #6aa8d8; border-radius: 4px; width: 100%; }
+  #hud-bottom-right { position: absolute; right: 14px; bottom: 14px; text-align: right; }
+  #hud-speed { font-size: 30px; font-weight: 800; text-shadow: 0 0 8px rgba(0,0,0,0.8); }
+  #hud-condition, #hud-weapon, #hud-radio { font-size: 14px; color: #e8e2d0; text-shadow: 0 0 6px rgba(0,0,0,0.9); }
+  #hud-dialogue { position: absolute; left: 50%; bottom: 18px; transform: translateX(-50%);
+    width: 560px; max-width: 72vw; }
+  #hud-dialogue-speaker { font-weight: 800; color: #f2c230; }
+  #hud-dialogue-text { font-size: 15px; margin-top: 2px; }
+  #hud-toast { position: absolute; left: 50%; top: 22%; transform: translateX(-50%);
+    font-size: 20px; font-weight: 800; color: #ffd98a; text-shadow: 0 0 10px rgba(0,0,0,0.9); }
+  .screen { position: fixed; inset: 0; z-index: 10; display: flex; align-items: center; justify-content: center;
+    background: linear-gradient(180deg, rgba(20,30,60,0.55), rgba(60,20,10,0.72)); }
+  .screen-inner { text-align: center; max-width: 720px; padding: 24px; }
+  .logo { font-size: 64px; font-weight: 900; letter-spacing: 4px; color: #ffd98a;
+    text-shadow: 0 4px 0 #b0502e, 0 8px 24px rgba(0,0,0,0.7); }
+  .tagline { font-size: 17px; color: #f2ede2; margin: 6px 0 20px; }
+  .menu-btn { display: block; width: 320px; margin: 8px auto; padding: 12px 16px; font-size: 17px; font-weight: 700;
+    color: #1b1f2a; background: #f2c230; border: none; border-radius: 8px; cursor: pointer; pointer-events: auto; }
+  .menu-btn.secondary { background: rgba(242,237,226,0.9); }
+  .menu-btn:disabled { opacity: 0.45; cursor: default; }
+  .roster { display: flex; gap: 12px; justify-content: center; margin: 18px 0 6px; }
+  .roster-card { width: 150px; padding: 10px; background: rgba(16,20,30,0.72); border-radius: 8px; font-size: 13px; }
+  .roster-card b { color: #f2c230; }
+  #howto-panel { text-align: left; margin: 14px auto; width: 520px; max-width: 88vw; font-size: 14px; line-height: 1.55; }
+  #save-line, #settings-line { font-size: 14px; color: #ffd98a; margin-top: 8px; }
+  .small-btn { display: inline-block; width: auto; margin: 4px; padding: 8px 12px; font-size: 14px; }
+  #over-title { font-size: 72px; font-weight: 900; letter-spacing: 6px; color: #ff5a4a;
+    text-shadow: 0 4px 0 #5a0e08, 0 8px 24px rgba(0,0,0,0.7); }
+  #over-sub { font-size: 17px; margin: 8px 0 20px; }
+  #status { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+</style>
+<script type="importmap">
+{ "imports": { "three": "./vendor/three.module.min.js" } }
+</script>
+</head>
+<body>
+<canvas id="game" aria-label="Solstice Bay: drive and walk through a sunset coastal city, take on story jobs and lose the police"></canvas>
+<p id="status" role="status" aria-live="polite"></p>
+
+<div id="hud" class="hidden">
+  <div id="hud-mission" class="panel">
+    <div id="hud-mission-title">Ch.1 Homecoming</div>
+    <div id="hud-mission-text">Drive to Calloway Garage</div>
+    <div id="hud-mission-bar-wrap"><div id="hud-mission-bar"></div></div>
+    <div id="hud-mission-timer"></div>
+  </div>
+  <div id="hud-top-center">
+    <div id="hud-stars">☆☆☆☆☆</div>
+    <div id="hud-police"></div>
+  </div>
+  <div id="hud-top-right">
+    <div id="hud-money">$250</div>
+    <div id="hud-rep">REP 0</div>
+    <div id="hud-day">DAY 1</div>
+  </div>
+  <div id="hud-bottom-left">
+    <canvas id="hud-minimap" width="190" height="190"></canvas>
+    <div id="hud-district">Ocean Boulevard</div>
+    <div class="bar-wrap"><div id="hud-health"></div></div>
+    <div class="bar-wrap"><div id="hud-armour"></div></div>
+  </div>
+  <div id="hud-bottom-right">
+    <div id="hud-speed">0 km/h</div>
+    <div id="hud-condition">ON FOOT</div>
+    <div id="hud-weapon">Fists · ∞</div>
+    <div id="hud-radio">Tide FM 97.3</div>
+  </div>
+  <div id="hud-dialogue" class="panel hidden">
+    <div id="hud-dialogue-speaker">Mara</div>
+    <div id="hud-dialogue-text"></div>
+  </div>
+  <div id="hud-toast" class="hidden"></div>
+</div>
+
+<div id="screen-title" class="screen">
+  <div class="screen-inner">
+    <div class="logo">SOLSTICE BAY</div>
+    <div class="tagline">A getaway driver comes home. Seven jobs to buy back her brother's garage — sun, sea, sirens and the SBPD.</div>
+    <button id="btn-continue" class="menu-btn">CONTINUE</button>
+    <button id="btn-new" class="menu-btn secondary">NEW GAME</button>
+    <button id="btn-howto" class="menu-btn secondary">HOW TO PLAY</button>
+    <div id="howto-panel" class="panel hidden">
+      W A S D drive and walk · Shift sprint · E steal or enter a car · Space handbrake ·
+      Click or J shoot · Q change weapon · R radio station · C camera · P pause ·
+      Mouse drag orbits the camera. Follow the gold beacon. Lose the stars to lose the heat.
+      Save: progress, money and reputation are kept in this browser.
+    </div>
+    <div class="roster">
+      <div class="roster-card"><b>Rae Calloway</b><br>Getaway driver, back after three years away.</div>
+      <div class="roster-card"><b>Mara Voss</b><br>Garage friend. Knows every crew in the bay.</div>
+      <div class="roster-card"><b>Deke Farr</b><br>Cab dispatcher. Pays cash, asks nothing.</div>
+      <div class="roster-card"><b>Marlow</b><br>Crew boss. Holds the garage papers.</div>
+    </div>
+    <div id="save-line"></div>
+    <div>
+      <button id="btn-radio" class="menu-btn secondary small-btn">RADIO</button>
+      <button id="btn-camera" class="menu-btn secondary small-btn">CAMERA</button>
+      <button id="btn-mute" class="menu-btn secondary small-btn">SOUND</button>
+    </div>
+    <div id="settings-line">Tide FM 97.3 · Chase camera · Sound on</div>
+  </div>
+</div>
+
+<div id="screen-paused" class="screen hidden">
+  <div class="screen-inner">
+    <div class="logo" style="font-size:44px">PAUSED</div>
+    <div class="tagline">The bay waits. The SBPD does not — for long.</div>
+    <button id="btn-resume" class="menu-btn">RESUME</button>
+    <button id="btn-title" class="menu-btn secondary">QUIT TO TITLE</button>
+  </div>
+</div>
+
+<div id="screen-over" class="screen hidden">
+  <div class="screen-inner">
+    <div id="over-title">WASTED</div>
+    <div id="over-sub">Solstice Bay is not done with you yet.</div>
+    <button id="btn-restart" class="menu-btn">TRY AGAIN</button>
+    <button id="btn-title" class="menu-btn secondary">QUIT TO TITLE</button>
+  </div>
+</div>
+
+<div id="screen-complete" class="screen hidden">
+  <div class="screen-inner">
+    <div class="logo" style="font-size:44px">THE GARAGE IS YOURS</div>
+    <div class="tagline">Marlow is done. The keys are back on their hook, and Rae Calloway is home for good. Thanks for playing Solstice Bay.</div>
+    <button id="btn-again" class="menu-btn">PLAY AGAIN</button>
+  </div>
+</div>
+
+<script type="module" src="./src/main.js"></script>
+</body>
+</html>
