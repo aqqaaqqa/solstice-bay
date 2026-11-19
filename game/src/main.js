@@ -16,7 +16,7 @@ import { createUI } from './ui.js';
 import { createInput, ACTION_CONFIRM, ACTION_PAUSE, ACTION_ENTER, ACTION_WEAPON, ACTION_RADIO, ACTION_CAMERA } from './input.js';
 import { createAudio } from './audio.js';
 import { loadSave, writeSave, defaultSave, readBest, writeBest } from './save.js';
-import { stageShot, shotInput } from './shots.js';
+import { stageShot, shotInput, pinShotActors } from './shots.js';
 
 const params = new URLSearchParams(window.location.search);
 const shot = params.get('shot');
@@ -341,6 +341,10 @@ function stepWorld(dt, scripted) {
   G.audio.engine(G.playerCar ? Math.abs(G.playerCar.speed) / 46 : Math.abs(p.speed) / 10, !!G.playerCar);
   G.audio.update(dt);
   G.hud.update(dt, G, confirm);
+  // Shot mode: re-pin the dressed traffic / pedestrians to their offsets
+  // relative to the player after every system has moved, so the shutter
+  // frame is the staged one. No-op in normal play (no G.shotMode).
+  pinShotActors(G);
   if (status && G.missions.current()) status.textContent = G.missions.current().text;
 }
 
@@ -359,6 +363,9 @@ function runShot(name) {
     }
     const target = G.playerCar ? G.playerCar.pos : G.player.pos;
     G.stage.updateCamera(target, G.player.heading, G.player.speed, 1, !G.playerCar);
+    // The dialogue timer runs out over a long staged run; re-show the
+    // shot line so it is on screen at the shutter.
+    if (G.shotDialogue) G.hud.showDialogue(G.shotDialogue);
     G.hud.update(0, G, false);
   }
   let painted = 0;

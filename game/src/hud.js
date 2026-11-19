@@ -56,6 +56,14 @@ export function createHud() {
     }
   }
 
+  function setHtml(node, key, value) {
+    if (!node) return;
+    if (cache.get(key) !== value) {
+      cache.set(key, value);
+      node.innerHTML = value;
+    }
+  }
+
   function drawMinimap(G) {
     if (!mapCtx) return;
     const S = 190;
@@ -188,14 +196,19 @@ export function createHud() {
       const car = G.playerCar;
       set(el.speed, 'speed', car ? `${Math.round(Math.abs(car.speed) * 3.6)} km/h` : `${Math.round(Math.abs(p.speed || 0) * 3.6)} km/h`);
       set(el.condition, 'cond', car ? `CAR ${Math.max(0, Math.round(100 - car.damage))}%` : 'ON FOOT');
-      const w = WEAPONS[p.weapon];
-      const ammo = w.ammo === Infinity ? '∞' : String(p.ammo[p.weapon] || 0);
-      set(el.weapon, 'weapon', `${w.name} · ${ammo}`);
+      // Weapon slots with ammo (top-10 covers show these as slots).
+      setHtml(el.weapon, 'weaponslots',
+        `<span class="wslot${p.weapon === 'pistol' ? ' on' : ''}">PISTOL · ${p.ammo.pistol || 0}</span>` +
+        `<span class="wslot${p.weapon === 'smg' ? ' on' : ''}">SMG · ${p.ammo.smg || 0}</span>`);
       set(el.radio, 'radio', G.audio ? G.audio.stationName() : 'Tide FM 97.3');
       set(el.district, 'district', districtAt(p.pos.x, p.pos.z));
       if (el.police && G.policeBehaviours) {
-        const text = G.policeBehaviours.map((b) => `${b.kind} ${b.dist ? b.dist + 'm' : ''}`).join('  ·  ');
-        set(el.police, 'police', text);
+        // Police response list: one row per unit, behaviour chip + distance.
+        setHtml(el.police, 'police',
+          G.policeBehaviours.map((b) => {
+            const chip = b.kind === 'RAMMING' ? 'chip hot' : 'chip';
+            return `<div class="police-row"><span class="${chip}">${b.kind}</span><span>${b.dist ? `${b.dist}m` : ''}</span></div>`;
+          }).join(''));
       }
       drawMinimap(G);
     },

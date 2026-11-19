@@ -125,6 +125,66 @@ export function updatePolice(police, dt, G) {
   }
   if (police.ramCooldown > 0) police.ramCooldown -= dt;
 
+  // Shot mode (see shots.js): pin the pursuit to the frame instead of
+  // letting it chase freely. The chase camera looks forward past the
+  // player car, so police behind the player are behind the camera and
+  // invisible — flank them alongside the player instead, matching the
+  // player's speed so nobody rams (a ram would halve the player's speed
+  // and spray a burst over the player car). The helicopter moves from
+  // behind the player to ahead-and-to-the-side, up in the sky where the
+  // forward camera can see it. Normal play never sets G.shotMode, so
+  // none of this runs outside a staged shot.
+  if (G.shotMode === 'chase' || G.shotMode === 'play' || G.shotMode === 'end') {
+    const fwd = G.playerCar
+      ? { x: Math.sin(G.playerCar.heading), z: Math.cos(G.playerCar.heading) }
+      : { x: Math.sin(G.player.heading), z: Math.cos(G.player.heading) };
+    const right = { x: fwd.z, z: -fwd.x };
+    const speed = G.playerCar ? Math.abs(G.playerCar.speed) : 0;
+    const flank = [
+      { f: 8, r: -5.5 },
+      { f: 4, r: 5.5 },
+      { f: 0, r: -5.5 },
+      { f: -2, r: 5.5 },
+    ];
+    const shotBehaviours = [];
+    police.cars.forEach((car, i) => {
+      const off = flank[i % flank.length];
+      car.pos.set(
+        playerPos.x + fwd.x * off.f + right.x * off.r,
+        0,
+        playerPos.z + fwd.z * off.f + right.z * off.r,
+      );
+      car.heading = G.playerCar ? G.playerCar.heading : G.player.heading;
+      car.group.rotation.y = car.heading;
+      car.speed = speed;
+      const flash = Math.floor(police.time * 6) % 2 === 0;
+      if (car.lightRed) car.lightRed.visible = flash;
+      if (car.lightBlue) car.lightBlue.visible = !flash;
+      const dist = Math.round(Math.hypot(off.f, off.r));
+      shotBehaviours.push({ kind: dist < 25 ? 'RAMMING' : 'PURSUING', dist });
+    });
+    const heliOn = wanted >= 4;
+    police.heli.visible = heliOn;
+    if (heliOn) {
+      // West side (the beach/sea) in both directions: the east side is
+      // buildings, and on a southbound run the helicopter would sit over
+      // them and be hidden behind one. For a northbound run this is the
+      // same position as before (right.x * -14 is -14 when facing north),
+      // so the chase and play shots are unchanged.
+      police.heli.position.set(
+        playerPos.x + fwd.x * 42 - 14,
+        19,
+        playerPos.z + fwd.z * 42,
+      );
+      police.heli.rotation.y = Math.atan2(playerPos.x - police.heli.position.x, playerPos.z - police.heli.position.z);
+      police.heliRotor.rotation.y += dt * 22;
+      shotBehaviours.push({ kind: 'SPOTLIGHT ON YOU', dist: 0 });
+    }
+    if (wanted >= 3) shotBehaviours.push({ kind: 'ROADBLOCK AHEAD', dist: 46 });
+    if (G.audio) G.audio.siren(wanted > 0);
+    return shotBehaviours;
+  }
+
   const behaviours = [];
   for (const car of police.cars) {
     const dx = playerPos.x - car.pos.x;
