@@ -16,7 +16,7 @@ import { createUI } from './ui.js';
 import { createInput, ACTION_CONFIRM, ACTION_PAUSE, ACTION_ENTER, ACTION_WEAPON, ACTION_RADIO, ACTION_CAMERA } from './input.js';
 import { createAudio } from './audio.js';
 import { loadSave, writeSave, defaultSave, readBest, writeBest } from './save.js';
-import { stageShot, shotInput, pinShotActors } from './shots.js';
+import { stageShot, shotInput, pinShotActors, pinShotEnemies } from './shots.js';
 
 const params = new URLSearchParams(window.location.search);
 const shot = params.get('shot');
@@ -58,11 +58,22 @@ G.input = createInput(canvas);
 G.playerCar = null;
 G.parkedCars = [];
 
+// Lifetime stats for the STATS screen (pause menu). All tracked live and
+// persisted with the save, so the screen shows real values, not defaults.
+G.stats = {
+  carsStolen: saveData.carsStolen || 0,
+  distanceKm: saveData.distanceKm || 0,
+  bestWanted: saveData.bestWanted || 0,
+  playTime: saveData.playTime || 0,
+};
+
 G.save = () => {
   writeSave({
     mission: G.missions.state.index, money: G.player.money, rep: G.player.rep,
     day: G.player.day, best: G.best, radio: G.radioIndex, camera: G.stage.cam.mode,
     muted: G.muted,
+    carsStolen: G.stats.carsStolen, distanceKm: G.stats.distanceKm,
+    bestWanted: G.stats.bestWanted, playTime: Math.round(G.stats.playTime),
   });
   if (G.player.money > G.best) {
     G.best = G.player.money;
@@ -82,6 +93,7 @@ G.onCrime = (type) => {
   } else {
     p.wanted = Math.min(5, p.wanted + 1);
   }
+  G.stats.bestWanted = Math.max(G.stats.bestWanted, p.wanted);
   noteCrime(G.police, G.time);
 };
 G.onEnemyDown = () => { if (G.missions) G.missions.onKill(); };
@@ -106,6 +118,7 @@ function enterCar(car) {
   const ti = G.traffic.cars.indexOf(car);
   if (ti >= 0) {
     G.traffic.cars.splice(ti, 1);
+    G.stats.carsStolen += 1;
     G.onCrime('steal');
     G.hud.showToast('Car stolen — the SBPD noticed.');
   }
@@ -188,6 +201,8 @@ G.ui = createUI({
     startPlay(0);
   },
   onResume: () => { G.screen = 'play'; G.ui.showScreen('play'); },
+  onStats: () => { G.screen = 'stats'; refreshStats(); G.ui.showScreen('stats'); },
+  onStatsBack: () => { G.screen = 'paused'; G.ui.showScreen('paused'); },
   onRestart: () => startPlay(G.missions.state.index),
   onRadio: () => {
     G.radioIndex = (G.radioIndex + 1) % RADIO.length;
@@ -207,6 +222,24 @@ G.ui = createUI({
   onTitle: () => { refreshSettings(); refreshSaveLine(); },
 });
 
+function refreshStats() {
+  const done = G.missions.state.done ? MISSIONS.length : G.missions.state.index;
+  const mins = Math.floor(G.stats.playTime / 60);
+  const secs = Math.floor(G.stats.playTime % 60);
+  let stars = '';
+  for (let i = 0; i < 5; i += 1) stars += i < G.stats.bestWanted ? '★' : '☆';
+  const row = (label, value) => `<div class="stat-row"><span>${label}</span><b>${value}</b></div>`;
+  G.ui.setStats(
+    row('Missions completed', `${done} / ${MISSIONS.length}`) +
+    row('Cars stolen', String(G.stats.carsStolen)) +
+    row('Distance driven', `${G.stats.distanceKm.toFixed(1)} km`) +
+    row('Best wanted level', `${stars} (${G.stats.bestWanted})`) +
+    row('Time played', `${mins}:${String(secs).padStart(2, '0')}`) +
+    row('Cash', `$${G.player.money.toLocaleString('en-US')}`) +
+    row('Reputation', `REP ${G.player.rep}`) +
+    row('Day', String(G.player.day)),
+  );
+}
 function refreshSettings() {
   G.ui.setSettingsLine(`${RADIO[G.radioIndex].name} · ${G.stage.cam.mode === 'chase' ? 'Chase' : 'Classic'} camera · Sound ${G.muted ? 'off' : 'on'}`);
 }
@@ -249,7 +282,10 @@ function stepWorld(dt, scripted) {
     return;
   }
   if (G.screen !== 'play') {
-    if (G.screen === 'paused' && (actions & (ACTION_PAUSE | ACTION_CONFIRM))) {
+    if (G.screen === 'stats' && (actions & ACTION_PAUSE)) {
+      G.screen = 'paused';
+      G.ui.showScreen('paused');
+    } else if (G.screen === 'paused' && (actions & (ACTION_PAUSE | ACTION_CONFIRM))) {
       G.screen = 'play';
       G.ui.showScreen('play');
     } else if (G.screen === 'over' && confirm) {
@@ -263,6 +299,9 @@ function stepWorld(dt, scripted) {
     G.ui.showScreen('paused');
     return;
   }
+  // Lifetime stats accrue only while actually playing.
+  G.stats.playTime += dt;
+  G.stats.bestWanted = Math.max(G.stats.bestWanted, G.player.wanted);
   if (actions & ACTION_ENTER) {
     if (G.playerCar) exitCar();
     else {
@@ -293,6 +332,7 @@ function stepWorld(dt, scripted) {
   if (G.playerCar) {
     const car = G.playerCar;
     const hit = updateCar(car, { throttle, steer, handbrake: input ? input.handbrake : G.input.handbrake() }, dt, G.city);
+    G.stats.distanceKm += (Math.abs(car.speed) * dt) / 1000;
     if (hit && Math.abs(car.speed) > 12) {
       G.stage.addShake(0.35);
       G.stage.spawnBurst(car.pos.x, 1, car.pos.z, 0xffc860, 8, 4, 3);
@@ -330,6 +370,7 @@ function stepWorld(dt, scripted) {
   G.gunshotAt = G.combat.gunshotAt;
   fireWeapon(G.combat, dt, G);
   updateEnemies(G.combat, dt, G);
+  pinShotEnemies(G);
   G.missions.update(dt);
   G.city.wheel.rotation.z += dt * 0.12;
   if (p.armour < 100 && p.health > 0) p.armour = Math.min(100, p.armour + dt * 1.5);
@@ -356,6 +397,9 @@ function runShot(name) {
     G.playerMesh.group.rotation.y = G.player.heading;
     G.stage.camera.position.set(-120, 18, 130);
     G.stage.camera.lookAt(-170, 4, 40);
+    // showScreen('title') fires onTitle, which re-reads the persisted
+    // save line and would overwrite the staged one — re-apply it after.
+    if (staged.saveLine) G.ui.setSaveLine(staged.saveLine);
   } else {
     for (let i = 0; i < staged.steps; i += 1) {
       stepWorld(STEP, shotInput(G, name));
@@ -363,10 +407,34 @@ function runShot(name) {
     }
     const target = G.playerCar ? G.playerCar.pos : G.player.pos;
     G.stage.updateCamera(target, G.player.heading, G.player.speed, 1, !G.playerCar);
+    // The staged shootout fires one shot here, so the shutter falls on a
+    // fresh muzzle flash + hit burst (no step runs after this, so the
+    // flash light and particles do not decay before the paint).
+    if (staged.fireAtEnd && !G.playerCar) {
+      G.firing = true;
+      fireWeapon(G.combat, 0, G);
+      G.firing = false;
+      // Visible muzzle sparks at the gun: the flash light alone only
+      // pools on the sand, so add a bright burst at the muzzle itself.
+      const pp = G.player;
+      G.stage.spawnBurst(
+        pp.pos.x + Math.sin(pp.heading) * 1.2, 1.5, pp.pos.z + Math.cos(pp.heading) * 1.2,
+        0xffe9a8, 12, 2, 2,
+      );
+    }
     // The dialogue timer runs out over a long staged run; re-show the
     // shot line so it is on screen at the shutter.
     if (G.shotDialogue) G.hud.showDialogue(G.shotDialogue);
     G.hud.update(0, G, false);
+    // The stats shot: pause mid-chase and open the STATS screen, so the
+    // panel sits over the action with the HUD still visible around it.
+    if (staged.statsAtEnd) {
+      G.screen = 'paused';
+      G.ui.showScreen('paused');
+      const statsBtn = document.getElementById('btn-stats');
+      if (statsBtn) statsBtn.click();
+      G.hud.update(0, G, false);
+    }
   }
   let painted = 0;
   function paint() {

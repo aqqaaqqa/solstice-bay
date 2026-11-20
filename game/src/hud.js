@@ -70,16 +70,17 @@ export function createHud() {
     const scale = S / 560;
     const toMap = (x, z) => [(x + 280) * scale, (z + 280) * scale];
     mapCtx.clearRect(0, 0, S, S);
-    mapCtx.fillStyle = 'rgba(20, 28, 40, 0.88)';
+    // Bright ground so the map reads in a screenshot, not black-on-dark.
+    mapCtx.fillStyle = '#46586e';
     mapCtx.fillRect(0, 0, S, S);
     // Water on the west edge.
-    mapCtx.fillStyle = '#2e7f9e';
+    mapCtx.fillStyle = '#54b0d6';
     mapCtx.fillRect(0, 0, (52) * scale, S);
-    mapCtx.fillStyle = '#e3c98f';
+    mapCtx.fillStyle = '#f2d89a';
     mapCtx.fillRect((52) * scale, 0, 14 * scale, S);
-    // Roads.
-    mapCtx.strokeStyle = '#5a6270';
-    mapCtx.lineWidth = 5;
+    // Roads: bright gold, wide enough to read at a glance.
+    mapCtx.strokeStyle = '#f2c230';
+    mapCtx.lineWidth = 6;
     for (const v of roadLines()) {
       const [x] = toMap(v, 0);
       const [, z] = toMap(0, v);
@@ -100,20 +101,29 @@ export function createHud() {
       mapCtx.fill();
     };
     if (G.traffic) {
-      for (const car of G.traffic.cars) dot(car.pos.x, car.pos.z, '#c9d2dc', 2);
+      for (const car of G.traffic.cars) dot(car.pos.x, car.pos.z, '#ffffff', 2.2);
       for (const ped of G.traffic.peds) {
         if (ped.down > 0) continue;
-        dot(ped.pos.x, ped.pos.z, '#8b93a3', 1.4);
+        dot(ped.pos.x, ped.pos.z, '#e8ecf2', 1.6);
       }
     }
     if (G.combat) {
       for (const e of G.combat.enemies) {
-        if (!e.down) dot(e.pos.x, e.pos.z, '#ff7a3c', 2.6);
+        if (!e.down) dot(e.pos.x, e.pos.z, '#ff7a3c', 2.8);
       }
     }
     if (G.police) {
-      for (const car of G.police.cars) dot(car.pos.x, car.pos.z, '#ff4040', 3);
-      for (const car of G.police.roadblocks) dot(car.pos.x, car.pos.z, '#ff4040', 2.4);
+      for (const car of G.police.cars) {
+        const [mx, mz] = toMap(car.pos.x, car.pos.z);
+        mapCtx.fillStyle = '#ff2e2e';
+        mapCtx.beginPath();
+        mapCtx.arc(mx, mz, 3.4, 0, Math.PI * 2);
+        mapCtx.fill();
+        mapCtx.strokeStyle = '#ffffff';
+        mapCtx.lineWidth = 1;
+        mapCtx.stroke();
+      }
+      for (const car of G.police.roadblocks) dot(car.pos.x, car.pos.z, '#ff2e2e', 2.6);
     }
     const target = G.missions ? G.missions.targetPos() : null;
     if (target && G.missions.state.active) {
@@ -129,18 +139,21 @@ export function createHud() {
       mapCtx.closePath();
       mapCtx.stroke();
     }
-    // Player arrow.
+    // Player arrow: white with a dark outline so it pops off the map.
     const [px, pz] = toMap(G.player.pos.x, G.player.pos.z);
     mapCtx.save();
     mapCtx.translate(px, pz);
     mapCtx.rotate(Math.PI - G.player.heading);
     mapCtx.fillStyle = '#ffffff';
+    mapCtx.strokeStyle = '#1b1f2a';
+    mapCtx.lineWidth = 1.5;
     mapCtx.beginPath();
     mapCtx.moveTo(0, -7);
     mapCtx.lineTo(5, 6);
     mapCtx.lineTo(-5, 6);
     mapCtx.closePath();
     mapCtx.fill();
+    mapCtx.stroke();
     mapCtx.restore();
   }
 
@@ -203,11 +216,11 @@ export function createHud() {
       set(el.radio, 'radio', G.audio ? G.audio.stationName() : 'Tide FM 97.3');
       set(el.district, 'district', districtAt(p.pos.x, p.pos.z));
       if (el.police && G.policeBehaviours) {
-        // Police response list: one row per unit, behaviour chip + distance.
+        // Police response list: callsign + behaviour chip + distance.
         setHtml(el.police, 'police',
           G.policeBehaviours.map((b) => {
             const chip = b.kind === 'RAMMING' ? 'chip hot' : 'chip';
-            return `<div class="police-row"><span class="${chip}">${b.kind}</span><span>${b.dist ? `${b.dist}m` : ''}</span></div>`;
+            return `<div class="police-row">${b.name ? `<span class="unit-name">${b.name}</span>` : ''}<span class="${chip}">${b.kind}</span><span>${b.dist ? `${b.dist}m` : ''}</span></div>`;
           }).join(''));
       }
       drawMinimap(G);
