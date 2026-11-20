@@ -22,7 +22,8 @@ WASD or arrows to move and drive, Space to confirm, E to enter or leave a car, S
 
 - **On foot and behind the wheel** — third-person on foot, chase camera driving, car theft with F, handbrake drifts.
 - **Seven story missions** — drive-to, pickup, tail, escape, delivery, shootout and a finale, with dialogue and stage bars.
-- **Wanted 0–5 stars** — police pursuit, ramming and roadblocks, helicopter with a spotlight at four stars and above.
+- **Wanted 0–5 stars** — police pursuit, ramming and roadblocks, helicopter with a spotlight at four stars and above. Every unit carries a callsign (KITE-1, MARLIN-2, …) shown in the HUD police panel with its behaviour and distance.
+- **Stats screen** — pause (P) and open STATS for missions completed, cars stolen, distance driven, best wanted level and time played, all tracked live and kept in the save.
 - **A living city** — traffic, pedestrians, palms, a pier with a ferris wheel, sunset lighting, three radio stations of synthesised music, and a localStorage save.
 
 ## Structure
