@@ -13,6 +13,10 @@ export function defaultSave() {
     radio: 0,
     camera: 'chase',
     muted: false,
+    carsStolen: 0,
+    distanceKm: 0,
+    bestWanted: 0,
+    playTime: 0,
   };
 }
 

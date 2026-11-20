@@ -62,6 +62,7 @@ export function stageShot(name, G) {
   G.shotLeg = 0;
   G.shotMode = null;
   G.shotDialogue = null;
+  G.shotEnemyPins = null;
 
   if (name === 'start') {
     G.missions.state.index = 0;
@@ -76,48 +77,68 @@ export function stageShot(name, G) {
     G.playerMesh.group.visible = true;
     G.ui.showScreen('title');
     G.ui.setSaveLine('Ch.3 · $31,420 · Day 3 — the garage is still Marlow\'s.');
-    return { screen: 'title', steps: 0 };
+    return { screen: 'title', steps: 0, saveLine: 'Ch.3 · $31,420 · Day 3 — the garage is still Marlow\'s.' };
   }
 
+  // 'play': Ch.5 Pier Shootout, staged as an on-foot beach shootout.
+  // Rae stands on the open sand just east of the pier, facing west down
+  // the pier axis: the ferris wheel sits ahead, the sea to the left, and
+  // no palm or building stands between her and the Marlow crew. z=70
+  // sits between the boulevard palm rows (z=56, 84), so no trunk blocks
+  // the frame the way the old driving shot's did. The player does not
+  // move (shotInput returns no throttle on foot), so the frame is the
+  // staged one; the crew are pinned (see pinShotEnemies) instead of
+  // spawning on the pier slab, where they would stand sunk to the waist
+  // in the planks.
   if (name === 'play') {
-    G.missions.startMission(1);
+    G.missions.startMission(4);
     G.screen = 'play';
-    // On the boulevard road itself, heading down Ocean Boulevard (+z).
-    G.parkPlayerCar('sports', -180, -40, 0);
-    G.enterCar(G.parkedCars[G.parkedCars.length - 1]);
-    // 2 stars so the shot-mode police flank the player (see police.js).
-    p.wanted = 2;
+    p.pos.set(-186, 0, 70);
+    p.heading = -Math.PI / 2;
+    p.onFoot = true;
+    G.playerMesh.group.visible = true;
+    G.playerMesh.group.position.copy(p.pos);
+    G.playerMesh.group.rotation.y = p.heading;
+    // 4 stars: 4 police flank in shot mode and the helicopter shows.
+    p.wanted = 4;
     G.police.lastCrimeAt = G.time;
-    G.hud.showDialogue([]);
-    // Straight down the boulevard for the whole run — do not let the
-    // autopilot turn off toward the fare target mid-shot.
-    G.shotLegs = [{ x: -180, z: 230 }];
-    G.shotLeg = 0;
+    G.hud.showDialogue(['Rae: Six of them? Mara, I drive. I don\'t do sieges.']);
+    G.shotDialogue = ['Rae: Six of them? Mara, I drive. I don\'t do sieges.'];
     G.shotMode = 'play';
-    // Shot-only dressing: pin traffic cars + pedestrians to fixed offsets
-    // ahead of the player so they are guaranteed in frame at the shutter.
-    // Offsets are {fwd, right} in units relative to the player car.
-    // Peds sit close on the sidewalks beside the car so they read at
-    // 166 km/h; traffic stays further ahead on the road.
-    dressShot(G, {
-      cars: [
-        { fwd: 22, right: -3.5 },
-        { fwd: 34, right: -3.5 },
-        { fwd: 28, right: 3.5 },
-      ],
-      peds: [
-        { fwd: 4, right: -11 },
-        { fwd: 10, right: -11 },
-        { fwd: 6, right: 11 },
-      ],
-    });
-    // 4s of full throttle: top speed, and the shutter falls mid-city
-    // (z≈+100) with buildings and palms around, not at the empty north
-    // edge of the map.
-    return { screen: 'play', steps: 240 };
+    // Pin the 6 Marlow crew to fixed offsets ahead of the player so the
+    // framing reproduces: every pin is within 15 units, so they hold
+    // their ground and shoot instead of walking in (combat.js only
+    // advances them past 16 units), and none sits on the pier slab.
+    // Offsets are {fwd, right} relative to the player, as in dressShot.
+    G.shotEnemyPins = [
+      { fwd: 11, right: -3.5 },
+      { fwd: 13, right: 2.5 },
+      { fwd: 12, right: 4.5 },
+      { fwd: 14, right: -1 },
+      { fwd: 10.5, right: 0.5 },
+      { fwd: 13.5, right: -4 },
+    ];
+    pinShotEnemies(G);
+    // 1s of standing firefight: the crew hold position and shoot, the
+    // police flank in shot mode, then runShot fires one staged shot so
+    // the shutter falls on a fresh muzzle flash (fireAtEnd). Kept to 1s
+    // so the crew's (random-timed) return fire only nicks the player —
+    // a longer run leaves health anywhere from 69–94% between takes.
+    return { screen: 'play', steps: 60, fireAtEnd: true };
   }
 
-  if (name === 'chase') {
+  if (name === 'chase' || name === 'stats') {
+    // 'stats' is the same Ch.6 chase drive, but the shot ends on the
+    // STATS screen over the action instead of on the road. Steal a
+    // traffic car first, for real, so the stats are non-zero and
+    // plausible (a fresh profile shows 0 cars stolen, 0.0 km).
+    if (name === 'stats') {
+      const victim = G.traffic.cars[0];
+      if (victim) {
+        G.enterCar(victim);
+        G.exitCar();
+      }
+    }
     G.missions.startMission(5);
     // Jump the heist to its escape step: wanted 4, run for the garage.
     G.missions.state.step = 2;
@@ -164,7 +185,9 @@ export function stageShot(name, G) {
     });
     // 5s of full throttle: top speed, and the shutter falls at z≈-44
     // with the ferris wheel ahead, not at the empty north edge of the map.
-    return { screen: 'play', steps: 300 };
+    // For 'stats' the shutter is the STATS screen over this same frame
+    // (runShot pauses and opens it after the drive).
+    return { screen: 'play', steps: 300, statsAtEnd: name === 'stats' };
   }
 
   // 'end': finale drive — Ch.7, "Meet Mara at Calloway Garage". Rae drives
@@ -222,7 +245,7 @@ export function stageShot(name, G) {
 }
 
 export function shotInput(G, name) {
-  if (name === 'play' || name === 'chase' || name === 'end') {
+  if (name === 'play' || name === 'chase' || name === 'end' || name === 'stats') {
     const cur = G.missions.current();
     return autopilot(G, cur ? cur.target : null);
   }
@@ -244,6 +267,26 @@ function dressShot(G, { cars, peds }) {
     if (ped) ped.shotPin = pin;
   });
   pinShotActors(G);
+}
+
+// Re-pin the Marlow crew to their shot offsets relative to the player
+// after every step, so the staged shootout framing reproduces however
+// the sim moves them. Shot mode only — normal play never sets
+// shotEnemyPins, so this is a no-op there. Positions only: updateEnemies
+// already turned each one to face the player before this runs.
+export function pinShotEnemies(G) {
+  if (!G.shotMode || !G.shotEnemyPins || !G.combat) return;
+  const p = G.player;
+  const fx = Math.sin(p.heading);
+  const fz = Math.cos(p.heading);
+  const rx = Math.cos(p.heading);
+  const rz = -Math.sin(p.heading);
+  G.combat.enemies.forEach((e, i) => {
+    const pin = G.shotEnemyPins[i % G.shotEnemyPins.length];
+    if (!pin || e.down) return;
+    e.pos.set(p.pos.x + fx * pin.fwd + rx * pin.right, 0, p.pos.z + fz * pin.fwd + rz * pin.right);
+    e.mesh.group.position.copy(e.pos);
+  });
 }
 
 export function pinShotActors(G) {

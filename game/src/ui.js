@@ -5,6 +5,7 @@ export function createUI(callbacks) {
   const screens = {
     title: document.getElementById('screen-title'),
     paused: document.getElementById('screen-paused'),
+    stats: document.getElementById('screen-stats'),
     over: document.getElementById('screen-over'),
     complete: document.getElementById('screen-complete'),
   };
@@ -26,6 +27,8 @@ export function createUI(callbacks) {
   bind('btn-continue', () => callbacks.onContinue && callbacks.onContinue());
   bind('btn-new', () => callbacks.onNewGame && callbacks.onNewGame());
   bind('btn-resume', () => callbacks.onResume && callbacks.onResume());
+  bind('btn-stats', () => callbacks.onStats && callbacks.onStats());
+  bind('btn-stats-back', () => callbacks.onStatsBack && callbacks.onStatsBack());
   bind('btn-restart', () => callbacks.onRestart && callbacks.onRestart());
   bind('btn-again', () => callbacks.onRestart && callbacks.onRestart());
   bind('btn-title', () => showScreen('title'));
@@ -54,6 +57,10 @@ export function createUI(callbacks) {
     setSettingsLine(text) {
       const node = document.getElementById('settings-line');
       if (node) node.textContent = text;
+    },
+    setStats(html) {
+      const node = document.getElementById('stats-rows');
+      if (node) node.innerHTML = html;
     },
   };
 }

@@ -7,6 +7,16 @@ import { makeCar, updateCar } from './vehicles.js';
 import { nearestRoadPoint } from './city.js';
 import { range } from './random.js';
 
+// Beach-name callsigns, one per unit — the HUD panel shows these next to
+// the behaviour chip, like the top entries' named-unit panels.
+export const CALLSIGNS = ['KITE-1', 'MARLIN-2', 'TARPON-3', 'PELICAN-4', 'CORAL-5', 'SURF-6', 'TIDE-7', 'REEF-8', 'GULL-9'];
+export const HELI_CALLSIGN = 'AIR-1';
+
+function nextCallsign(police) {
+  const used = new Set([...police.cars, ...police.roadblocks].map((c) => c.callsign));
+  return CALLSIGNS.find((n) => !used.has(n)) || `SBPD-${police.cars.length + police.roadblocks.length + 1}`;
+}
+
 function policeAngleDiff(a, b) {
   let d = a - b;
   while (d > Math.PI) d -= Math.PI * 2;
@@ -58,6 +68,7 @@ function spawnPoliceCar(police, G) {
   car.heading = Math.atan2(G.player.pos.x - rp.x, G.player.pos.z - rp.z);
   car.group.rotation.y = car.heading;
   car.isPolice = true;
+  car.callsign = nextCallsign(police);
   G.scene.add(car.group);
   police.cars.push(car);
   return car;
@@ -76,6 +87,7 @@ function spawnRoadblock(police, G) {
     car.heading = Math.atan2(fwd.x, fwd.z) + Math.PI / 2;
     car.group.rotation.y = car.heading;
     car.isPolice = true;
+    car.callsign = nextCallsign(police);
     car.speed = 0;
     G.scene.add(car.group);
     police.roadblocks.push(car);
@@ -161,7 +173,7 @@ export function updatePolice(police, dt, G) {
       if (car.lightRed) car.lightRed.visible = flash;
       if (car.lightBlue) car.lightBlue.visible = !flash;
       const dist = Math.round(Math.hypot(off.f, off.r));
-      shotBehaviours.push({ kind: dist < 25 ? 'RAMMING' : 'PURSUING', dist });
+      shotBehaviours.push({ name: car.callsign, kind: dist < 25 ? 'RAMMING' : 'PURSUING', dist });
     });
     const heliOn = wanted >= 4;
     police.heli.visible = heliOn;
@@ -178,9 +190,9 @@ export function updatePolice(police, dt, G) {
       );
       police.heli.rotation.y = Math.atan2(playerPos.x - police.heli.position.x, playerPos.z - police.heli.position.z);
       police.heliRotor.rotation.y += dt * 22;
-      shotBehaviours.push({ kind: 'SPOTLIGHT ON YOU', dist: 0 });
+      shotBehaviours.push({ name: HELI_CALLSIGN, kind: 'SPOTLIGHT ON YOU', dist: 0 });
     }
-    if (wanted >= 3) shotBehaviours.push({ kind: 'ROADBLOCK AHEAD', dist: 46 });
+    if (wanted >= 3) shotBehaviours.push({ name: police.roadblocks[0] ? police.roadblocks[0].callsign : 'RB-1', kind: 'ROADBLOCK AHEAD', dist: 46 });
     if (G.audio) G.audio.siren(wanted > 0);
     return shotBehaviours;
   }
@@ -214,6 +226,7 @@ export function updatePolice(police, dt, G) {
       if (G.audio) G.audio.punch();
     }
     behaviours.push({
+      name: car.callsign,
       kind: dist < 25 ? 'RAMMING' : 'PURSUING',
       dist: Math.round(dist),
     });
@@ -226,9 +239,9 @@ export function updatePolice(police, dt, G) {
     police.heli.position.set(playerPos.x + 12, 42, playerPos.z - 10);
     police.heli.rotation.y = Math.atan2(playerPos.x - police.heli.position.x, playerPos.z - police.heli.position.z);
     police.heliRotor.rotation.y += dt * 22;
-    behaviours.push({ kind: 'SPOTLIGHT ON YOU', dist: 0 });
+    behaviours.push({ name: HELI_CALLSIGN, kind: 'SPOTLIGHT ON YOU', dist: 0 });
   }
-  if (wanted >= 3) behaviours.push({ kind: 'ROADBLOCK AHEAD', dist: 46 });
+  if (wanted >= 3) behaviours.push({ name: police.roadblocks[0] ? police.roadblocks[0].callsign : 'RB-1', kind: 'ROADBLOCK AHEAD', dist: 46 });
 
   // Busted: on foot, a police car sits on the player while they crawl.
   const nearest = police.cars.reduce((m, c) => Math.min(m, Math.hypot(c.pos.x - playerPos.x, c.pos.z - playerPos.z)), Infinity);
