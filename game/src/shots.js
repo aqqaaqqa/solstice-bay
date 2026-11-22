@@ -127,7 +127,7 @@ export function stageShot(name, G) {
     return { screen: 'play', steps: 60, fireAtEnd: true };
   }
 
-  if (name === 'chase' || name === 'stats') {
+  if (name === 'chase' || name === 'stats' || name === 'garage') {
     // 'stats' is the same Ch.6 chase drive, but the shot ends on the
     // STATS screen over the action instead of on the road. Steal a
     // traffic car first, for real, so the stats are non-zero and
@@ -138,6 +138,17 @@ export function stageShot(name, G) {
         G.enterCar(victim);
         G.exitCar();
       }
+    }
+    // 'garage' stages the shop state: Engine Tune already owned (so the
+    // tuned top speed shows in the stat bars), Armour Plating selected,
+    // Nitro Kit locked, no purchase made in the shot itself.
+    if (name === 'garage') {
+      G.player.tune = 1;
+      G.player.plating = false;
+      G.player.respray = 0;
+      G.player.gear = { bodyarmour: false, ammo: false, flare: false };
+      G.garage.tab = 'workshop';
+      G.garage.selected = 'armour';
     }
     G.missions.startMission(5);
     // Jump the heist to its escape step: wanted 4, run for the garage.
@@ -186,8 +197,10 @@ export function stageShot(name, G) {
     // 5s of full throttle: top speed, and the shutter falls at z≈-44
     // with the ferris wheel ahead, not at the empty north edge of the map.
     // For 'stats' the shutter is the STATS screen over this same frame
-    // (runShot pauses and opens it after the drive).
-    return { screen: 'play', steps: 300, statsAtEnd: name === 'stats' };
+    // (runShot pauses and opens it after the drive); for 'garage' it is
+    // the GARAGE screen instead. (With the staged tune owned, the garage
+    // run tops out ~190 km/h and ends ~25 units further north.)
+    return { screen: 'play', steps: 300, statsAtEnd: name === 'stats', garageAtEnd: name === 'garage' };
   }
 
   // 'end': finale drive — Ch.7, "Meet Mara at Calloway Garage". Rae drives
@@ -245,7 +258,7 @@ export function stageShot(name, G) {
 }
 
 export function shotInput(G, name) {
-  if (name === 'play' || name === 'chase' || name === 'end' || name === 'stats') {
+  if (name === 'play' || name === 'chase' || name === 'end' || name === 'stats' || name === 'garage') {
     const cur = G.missions.current();
     return autopilot(G, cur ? cur.target : null);
   }
