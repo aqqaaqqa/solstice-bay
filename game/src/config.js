@@ -168,3 +168,7 @@ export const PALETTE = {
 
 export const SAVE_KEY = 'solstice-bay.save.v1';
 export const BEST_KEY = 'solstice-bay.best.v1';
+
+// Marlow's asking price for the garage — the fund target. Display only:
+// the story resolves by mission order, never by reaching this number.
+export const GARAGE_PRICE = 50000;

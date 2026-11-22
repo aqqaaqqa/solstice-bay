@@ -2,7 +2,7 @@
 // circular minimap, speed and car condition, weapon slots, radio, district
 // name, dialogue bar and the police response list. DOM text is updated
 // only when it changes, so a frame allocates nothing.
-import { districtAt, WEAPONS } from './config.js';
+import { districtAt, WEAPONS, GARAGE_PRICE } from './config.js';
 import { roadLines } from './city.js';
 
 function $(id) {
@@ -14,6 +14,8 @@ export function createHud() {
     money: $('hud-money'),
     rep: $('hud-rep'),
     day: $('hud-day'),
+    garage: $('hud-garage'),
+    garageBar: $('hud-garage-bar'),
     stars: $('hud-stars'),
     health: $('hud-health'),
     armour: $('hud-armour'),
@@ -190,10 +192,24 @@ export function createHud() {
         toastTimer -= dt;
         if (toastTimer <= 0 && el.toast) el.toast.classList.add('hidden');
       }
+      // The garage is a paused shop screen: hide the chase HUD (police
+      // list and dialogue) while it is open, so they cannot show through
+      // the panel or clash with its header. The stats screen keeps its
+      // old behaviour. On leaving, the dialogue reappears while its
+      // timer is still running; the police list is never otherwise hidden.
+      const garageOpen = G.screen === 'garage';
+      if (el.police) el.police.classList.toggle('hidden', garageOpen);
+      if (el.dialogue) {
+        if (garageOpen) el.dialogue.classList.add('hidden');
+        else if (dialogueTimer > 0) el.dialogue.classList.remove('hidden');
+      }
       const p = G.player;
       set(el.money, 'money', `$${p.money.toLocaleString('en-US')}`);
       set(el.rep, 'rep', `REP ${p.rep}`);
       set(el.day, 'day', `DAY ${p.day}`);
+      // The garage fund IS the cash — no new game state.
+      set(el.garage, 'garage', `GARAGE $${p.money.toLocaleString('en-US')} / $${GARAGE_PRICE.toLocaleString('en-US')}`);
+      setBar(el.garageBar, 'gbar', Math.min(1, p.money / GARAGE_PRICE));
       let stars = '';
       for (let i = 0; i < 5; i += 1) stars += i < p.wanted ? '★' : '☆';
       set(el.stars, 'stars', stars);

@@ -6,6 +6,7 @@ export function createUI(callbacks) {
     title: document.getElementById('screen-title'),
     paused: document.getElementById('screen-paused'),
     stats: document.getElementById('screen-stats'),
+    garage: document.getElementById('screen-garage'),
     over: document.getElementById('screen-over'),
     complete: document.getElementById('screen-complete'),
   };
@@ -29,6 +30,27 @@ export function createUI(callbacks) {
   bind('btn-resume', () => callbacks.onResume && callbacks.onResume());
   bind('btn-stats', () => callbacks.onStats && callbacks.onStats());
   bind('btn-stats-back', () => callbacks.onStatsBack && callbacks.onStatsBack());
+  bind('btn-garage', () => callbacks.onGarage && callbacks.onGarage());
+  bind('btn-garage-back', () => callbacks.onGarageBack && callbacks.onGarageBack());
+  // One delegated handler for the garage panel: refreshGarage() rewrites
+  // #garage-rows innerHTML, so per-button bindings would not survive.
+  const garageRows = document.getElementById('garage-rows');
+  if (garageRows) {
+    garageRows.addEventListener('click', (event) => {
+      const buyBtn = event.target.closest('[data-buy]');
+      if (buyBtn) {
+        if (callbacks.onBuy) callbacks.onBuy(buyBtn.dataset.buy);
+        return;
+      }
+      const tabBtn = event.target.closest('[data-tab]');
+      if (tabBtn) {
+        if (callbacks.onGarageTab) callbacks.onGarageTab(tabBtn.dataset.tab);
+        return;
+      }
+      const row = event.target.closest('[data-select]');
+      if (row && callbacks.onGarageSelect) callbacks.onGarageSelect(row.dataset.select);
+    });
+  }
   bind('btn-restart', () => callbacks.onRestart && callbacks.onRestart());
   bind('btn-again', () => callbacks.onRestart && callbacks.onRestart());
   bind('btn-title', () => showScreen('title'));
@@ -60,6 +82,10 @@ export function createUI(callbacks) {
     },
     setStats(html) {
       const node = document.getElementById('stats-rows');
+      if (node) node.innerHTML = html;
+    },
+    setGarage(html) {
+      const node = document.getElementById('garage-rows');
       if (node) node.innerHTML = html;
     },
   };

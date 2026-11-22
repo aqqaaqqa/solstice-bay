@@ -17,6 +17,7 @@ export function defaultSave() {
     distanceKm: 0,
     bestWanted: 0,
     playTime: 0,
+    garage: { tune: 0, plating: false, respray: 0, gear: { bodyarmour: false, ammo: false, flare: false } },
   };
 }
 

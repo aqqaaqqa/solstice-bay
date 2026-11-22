@@ -11,6 +11,7 @@ import { createTraffic, updateTraffic, nearestCar } from './traffic.js';
 import { createPolice, updatePolice, noteCrime } from './police.js';
 import { createCombat, fireWeapon, updateEnemies, clearEnemies } from './combat.js';
 import { createMissions } from './missions.js';
+import { createGarage } from './garage.js';
 import { createHud } from './hud.js';
 import { createUI } from './ui.js';
 import { createInput, ACTION_CONFIRM, ACTION_PAUSE, ACTION_ENTER, ACTION_WEAPON, ACTION_RADIO, ACTION_CAMERA } from './input.js';
@@ -44,6 +45,14 @@ G.player = {
   health: 100, armour: 100,
   money: saveData.money, rep: saveData.rep, day: saveData.day,
   wanted: 0, weapon: 'pistol', ammo: { pistol: 120, smg: 0 },
+  // Garage upgrades, from the save (mirror money/rep/day above).
+  tune: saveData.garage ? saveData.garage.tune : 0,
+  plating: saveData.garage ? saveData.garage.plating : false,
+  respray: saveData.garage ? saveData.garage.respray : 0,
+  gear: {
+    bodyarmour: false, ammo: false, flare: false,
+    ...(saveData.garage && saveData.garage.gear ? saveData.garage.gear : {}),
+  },
 };
 G.playerMesh = makePerson(THREE, 0x2a7a6a, 0x2c3242, 0xe8b88a);
 G.playerMesh.group.position.copy(G.player.pos);
@@ -74,6 +83,10 @@ G.save = () => {
     muted: G.muted,
     carsStolen: G.stats.carsStolen, distanceKm: G.stats.distanceKm,
     bestWanted: G.stats.bestWanted, playTime: Math.round(G.stats.playTime),
+    garage: {
+      tune: G.player.tune, plating: G.player.plating, respray: G.player.respray,
+      gear: { ...G.player.gear },
+    },
   });
   if (G.player.money > G.best) {
     G.best = G.player.money;
@@ -101,6 +114,7 @@ G.onBusted = () => endRun('BUSTED', 'The SBPD took Rae in. The garage waits — 
 G.onWasted = () => endRun('WASTED', 'Solstice Bay is not done with you yet.');
 
 G.missions = createMissions(THREE, G.scene, G);
+G.garage = createGarage(G);
 
 function parkPlayerCar(kind, x, z, heading) {
   const car = makeCar(THREE, kind);
@@ -126,6 +140,9 @@ function enterCar(car) {
   if (pi >= 0) G.parkedCars.splice(pi, 1);
   G.playerCar = car;
   car.isPlayer = true;
+  // Owned garage upgrades follow Rae into any car she takes.
+  if (G.player.tune) car.tuneBoost = 1.15;
+  if (G.player.plating) car.plating = true;
   G.player.onFoot = false;
   G.playerMesh.group.visible = false;
   G.audio.blip();
@@ -198,11 +215,22 @@ G.ui = createUI({
     G.player.day = fresh.day;
     G.player.ammo = { pistol: 120, smg: 0 };
     G.player.weapon = 'pistol';
+    G.player.tune = fresh.garage.tune;
+    G.player.plating = fresh.garage.plating;
+    G.player.respray = fresh.garage.respray;
+    G.player.gear = { ...fresh.garage.gear };
+    G.garage.tab = 'workshop';
+    G.garage.selected = 'armour';
     startPlay(0);
   },
   onResume: () => { G.screen = 'play'; G.ui.showScreen('play'); },
   onStats: () => { G.screen = 'stats'; refreshStats(); G.ui.showScreen('stats'); },
   onStatsBack: () => { G.screen = 'paused'; G.ui.showScreen('paused'); },
+  onGarage: () => { G.screen = 'garage'; refreshGarage(); G.ui.showScreen('garage'); G.hud.update(0, G, false); },
+  onGarageBack: () => { G.screen = 'paused'; G.ui.showScreen('paused'); },
+  onBuy: (id) => { G.garage.buy(id); refreshGarage(); },
+  onGarageTab: (tab) => { G.garage.tab = tab; refreshGarage(); },
+  onGarageSelect: (id) => { G.garage.selected = id; refreshGarage(); },
   onRestart: () => startPlay(G.missions.state.index),
   onRadio: () => {
     G.radioIndex = (G.radioIndex + 1) % RADIO.length;
@@ -243,6 +271,9 @@ function refreshStats() {
 function refreshSettings() {
   G.ui.setSettingsLine(`${RADIO[G.radioIndex].name} · ${G.stage.cam.mode === 'chase' ? 'Chase' : 'Classic'} camera · Sound ${G.muted ? 'off' : 'on'}`);
 }
+function refreshGarage() {
+  G.ui.setGarage(G.garage.rowsHtml());
+}
 function refreshSaveLine() {
   const s = loadSave();
   if (s.mission > 0 || s.money > 250) {
@@ -282,7 +313,7 @@ function stepWorld(dt, scripted) {
     return;
   }
   if (G.screen !== 'play') {
-    if (G.screen === 'stats' && (actions & ACTION_PAUSE)) {
+    if ((G.screen === 'stats' || G.screen === 'garage') && (actions & ACTION_PAUSE)) {
       G.screen = 'paused';
       G.ui.showScreen('paused');
     } else if (G.screen === 'paused' && (actions & (ACTION_PAUSE | ACTION_CONFIRM))) {
@@ -434,6 +465,22 @@ function runShot(name) {
       const statsBtn = document.getElementById('btn-stats');
       if (statsBtn) statsBtn.click();
       G.hud.update(0, G, false);
+    }
+    // The garage shot: same chase, but the shot ends on the GARAGE screen.
+    if (staged.garageAtEnd) {
+      G.screen = 'paused';
+      G.ui.showScreen('paused');
+      const garageBtn = document.getElementById('btn-garage');
+      if (garageBtn) garageBtn.click();
+      G.hud.update(0, G, false);
+      // Pan the chase camera sideways so the hero car sits left of centre,
+      // clear of the right-aligned garage panel. Shot-only: real play
+      // keeps the car centred. Screen-right for heading h is
+      // (-cos h, sin h) in (x, z), so moving the camera that way shifts
+      // the car left in frame.
+      const h = G.player.heading;
+      G.stage.camera.position.x += -Math.cos(h) * 2;
+      G.stage.camera.position.z += Math.sin(h) * 2;
     }
   }
   let painted = 0;

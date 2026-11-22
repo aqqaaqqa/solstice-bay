@@ -65,7 +65,7 @@ export function makeCar(THREE_, kind, colorHex) {
     wheels.push({ pivot, wheel, front });
   }
   return {
-    kind, group, wheels, lightRed, lightBlue,
+    kind, group, wheels, lightRed, lightBlue, bodyMat,
     tune,
     pos: group.position,
     heading: 0,
@@ -88,8 +88,10 @@ export function carForward(car) {
 // the slower you go, handbrake drift, building collisions that cost speed.
 export function updateCar(car, input, dt, city) {
   const t = car.tune;
-  const target = input.throttle * t.top;
-  const rate = input.throttle > 0 ? t.accel : t.brake;
+  // The garage tune (+15%) lifts top speed and acceleration on any car.
+  const boost = car.tuneBoost || 1;
+  const target = input.throttle * t.top * boost;
+  const rate = input.throttle > 0 ? t.accel * boost : t.brake;
   if (car.speed < target) car.speed = Math.min(target, car.speed + rate * dt);
   else if (car.speed > target) car.speed = Math.max(target, car.speed - t.brake * dt);
   if (input.handbrake) car.speed *= Math.max(0, 1 - 1.6 * dt);
@@ -105,7 +107,9 @@ export function updateCar(car, input, dt, city) {
     // One wall scrape costs a little condition, then a short grace period:
     // sliding along a wall must not shred the car in a single second.
     if ((car.dmgCooldown || 0) <= 0) {
-      car.damage = Math.min(100, car.damage + Math.min(12, Math.abs(car.speed) * 0.4));
+      // Garage armour plating halves wall-hit damage.
+      const dmg = Math.min(12, Math.abs(car.speed) * 0.4);
+      car.damage = Math.min(100, car.damage + (car.plating ? dmg / 2 : dmg));
       car.dmgCooldown = 0.6;
     }
     car.speed *= 0.45;
