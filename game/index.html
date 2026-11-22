@@ -33,6 +33,8 @@
   #hud-top-right { position: absolute; top: 14px; right: 14px; text-align: right; }
   #hud-money { font-size: 24px; font-weight: 800; color: #7ddb8a; text-shadow: 0 0 8px rgba(0,0,0,0.8); }
   #hud-rep, #hud-day { font-size: 13px; color: #e8e2d0; }
+  #hud-garage { font-size: 13px; font-weight: 800; color: #ffd98a; margin-top: 4px; }
+  #hud-garage-bar { height: 8px; background: #f2c230; border-radius: 4px; width: 0; }
   #hud-bottom-left { position: absolute; left: 14px; bottom: 14px; }
   #hud-minimap { width: 190px; height: 190px; border-radius: 50%; border: 3px solid #f2c230;
     background: #46586e; box-shadow: 0 0 0 2px rgba(0,0,0,0.45), 0 4px 18px rgba(0,0,0,0.5); }
@@ -80,6 +82,43 @@
   .stat-row:last-child { border-bottom: none; }
   .stat-row b { color: #f2c230; }
   #howto-panel { text-align: left; margin: 14px auto; width: 520px; max-width: 88vw; font-size: 14px; line-height: 1.55; }
+  /* Garage shop: compact rows so the whole panel fits at 720p with the
+     minimap, speed and money still visible around it. The screen is
+     right-aligned (see #screen-garage below) so the hero car stays
+     visible on the left, rank-3 Dockside Customs style. */
+  #screen-garage { justify-content: flex-end; align-items: flex-start; padding-top: 47px; }
+  #screen-garage .screen-inner { background: transparent; padding: 10px 24px; margin-right: 20px; }
+  #screen-garage .logo { font-size: 26px; }
+  #screen-garage .tagline { font-size: 13px; margin: 4px 0 6px; }
+  #screen-garage #btn-garage-back { width: 280px; margin: 6px auto; padding: 10px 16px; }
+  #garage-rows { text-align: left; margin: 4px auto; padding: 6px 12px; width: 560px; max-width: 88vw; font-size: 14px; line-height: 1.35; }
+  .garage-fundline { display: flex; justify-content: space-between; gap: 12px; font-size: 13px; }
+  .garage-fundline b { color: #7ddb8a; }
+  .garage-bar-wrap { height: 8px; background: rgba(255,255,255,0.18); border-radius: 4px; margin: 2px 0 4px; }
+  .garage-bar { height: 8px; background: #f2c230; border-radius: 4px; }
+  .garage-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 2px 16px; margin: 2px 0 4px; }
+  .garage-stat-head { display: flex; justify-content: space-between; font-size: 12px; }
+  .garage-stat-head b { color: #f2c230; }
+  .garage-tag { color: #7ddb8a; }
+  .garage-tabs { display: flex; gap: 8px; margin: 2px 0 4px; }
+  .garage-tab { flex: 1; padding: 4px; font-size: 13px; font-weight: 800; letter-spacing: 1px;
+    background: rgba(20,28,44,0.88); color: #f2ede2; border: 1px solid rgba(242,237,226,0.4);
+    border-radius: 6px; cursor: pointer; }
+  .garage-tab.on { background: #f2c230; color: #14100a; border-color: #fff3c4; }
+  .garage-sec { font-size: 12px; font-weight: 800; letter-spacing: 1px; color: #f2c230; margin: 3px 0 1px; }
+  .garage-row { display: flex; align-items: center; gap: 10px; padding: 1px 6px; border-radius: 6px;
+    border-bottom: 1px solid rgba(255,255,255,0.10); cursor: pointer; }
+  .garage-row.sel { background: rgba(242,194,48,0.16); outline: 1px solid rgba(242,194,48,0.55); }
+  .garage-name { font-weight: 800; font-size: 13px; min-width: 118px; }
+  .garage-effect { flex: 1; font-size: 12px; color: #e8e2d0; }
+  .garage-buy { min-width: 108px; padding: 4px 8px; font-size: 12px; font-weight: 800; color: #14100a;
+    background: #f2c230; border: 1px solid #fff3c4; border-radius: 6px; cursor: pointer; }
+  .garage-buy:disabled { opacity: 0.45; cursor: default; }
+  .garage-desc { font-size: 13px; color: #ffd98a; margin-top: 4px; }
+  .garage-showroom { text-align: center; padding: 12px 0 4px; }
+  .garage-carname { font-size: 26px; font-weight: 900; letter-spacing: 2px; color: #ffe9ad; }
+  .garage-cardesc { font-size: 14px; color: #e8e2d0; margin-top: 4px; }
+  .garage-line { font-size: 13px; color: #ffd98a; margin-top: 10px; }
   #save-line, #settings-line { font-size: 14px; color: #ffd98a; margin-top: 8px; }
   .small-btn { display: inline-block; width: auto; margin: 4px; padding: 8px 12px; font-size: 14px; }
   #over-title { font-size: 72px; font-weight: 900; letter-spacing: 6px; color: #ff5a4a;
@@ -110,6 +149,8 @@
     <div id="hud-money">$250</div>
     <div id="hud-rep">REP 0</div>
     <div id="hud-day">DAY 1</div>
+    <div id="hud-garage">GARAGE $250 / $50,000</div>
+    <div class="bar-wrap" style="width:170px;margin-left:auto"><div id="hud-garage-bar"></div></div>
   </div>
   <div id="hud-bottom-left">
     <canvas id="hud-minimap" width="190" height="190"></canvas>
@@ -165,6 +206,7 @@
     <div class="tagline">The bay waits. The SBPD does not — for long.</div>
     <button id="btn-resume" class="menu-btn">RESUME</button>
     <button id="btn-stats" class="menu-btn secondary">STATS</button>
+    <button id="btn-garage" class="menu-btn secondary">GARAGE</button>
     <button id="btn-title" class="menu-btn secondary">QUIT TO TITLE</button>
   </div>
 </div>
@@ -175,6 +217,15 @@
     <div class="tagline">Rae Calloway — Solstice Bay</div>
     <div id="stats-rows" class="panel"></div>
     <button id="btn-stats-back" class="menu-btn">BACK</button>
+  </div>
+</div>
+
+<div id="screen-garage" class="screen hidden">
+  <div class="screen-inner">
+    <div class="logo" style="font-size:26px">SOLSTICE GARAGE</div>
+    <div class="tagline" style="margin-bottom:4px">Mara · mechanic · "You break it, I bill it."</div>
+    <div id="garage-rows" class="panel"></div>
+    <button id="btn-garage-back" class="menu-btn">BACK TO THE STREET</button>
   </div>
 </div>
 
